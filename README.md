@@ -299,7 +299,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 
 ## Support
-For support, email viyomshukla200@gmail.com or open an issue in the repository.
+For support, email viyomshukla2004@gmail.com or open an issue in the repository.
 
 
 
