@@ -2,6 +2,16 @@
 
 AI-powered YouTube thumbnail generator that helps creators design eye-catching thumbnails with ease.
 
+## Description
+
+Thumblify revolutionizes the way content creators design YouTube thumbnails by harnessing the power of artificial intelligence. Say goodbye to hours spent in design software and hello to professional, attention-grabbing thumbnails generated in seconds.
+
+Whether you're a beginner YouTuber or an established content creator, Thumblify makes thumbnail creation effortless. Simply describe your vision, choose your quality tier, and let our AI do the heavy lifting. With Pollination AI integration, every thumbnail is crafted to maximize click-through rates and viewer engagement.
+
+Our platform features a fair credit-based system where new users get 30 free credits to explore the service. Create basic thumbnails for just 5 credits or opt for premium quality at 10 credits per generation. Need more credits? Our seamless Razorpay integration makes purchasing additional credits quick and secure.
+
+Security and convenience are at the core of Thumblify. With Google OAuth authentication, you can sign up and start creating in seconds without the hassle of managing yet another password. Focus on what matters most - creating amazing content while we handle your thumbnail needs.
+
 ## Overview
 
 Thumblify is an AI-driven platform that generates professional YouTube thumbnails using advanced AI technology. With integrated payment processing and a credit-based system, users can create stunning thumbnails in just a few clicks.
@@ -100,7 +110,7 @@ cd server
 npm start
 ```
 
-The client will typically run on `http://localhost:5153` and the server on `http://localhost:5000`.
+The client will typically run on `http://localhost:3000` and the server on `http://localhost:5000`.
 
 ## How It Works
 
@@ -115,6 +125,24 @@ The client will typically run on `http://localhost:5153` and the server on `http
 - Basic thumbnail: **5 credits**
 - Premium thumbnail: **10 credits**
 
+## Screenshots
+
+### Homepage
+![Homepage](path/to/home.png)
+*Create stunning thumbnails that get clicks - instantly with AI*
+
+### Thumbnail Generator
+![Thumbnail Generator](path/to/generator.png)
+*Intuitive interface to create your custom thumbnails with various styles and color schemes*
+
+### Payment Integration
+![Razorpay Payment](path/to/payment.png)
+*Secure payment processing with multiple payment options via Razorpay*
+
+### Generated Thumbnails Gallery
+![My Generated Thumbnails](path/to/ai_generatorimage.png)
+*View and manage all your previously generated thumbnails*
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -125,8 +153,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-For support, email viyomshukla2004@gmail.com 
-or open an issue in the repository.
+For support, email support@thumblify.com or open an issue in the repository.
 
 ## Acknowledgments
 
