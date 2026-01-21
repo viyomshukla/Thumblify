@@ -40,7 +40,7 @@ const plansData = [
     credits: '50 credits',
     desc: 'Perfect for small projects and testing',
     features: [
-      '100 AI credits per month',
+      '50 AI credits per month',
       'Basic support',
       'Standard processing',
       'Email notifications'
@@ -55,7 +55,7 @@ const plansData = [
     credits: '75 credits',
     desc: 'Great for growing teams',
     features: [
-      '500 AI credits per month',
+      '75 AI credits per month',
       'Priority support',
       'Fast processing',
       'Advanced analytics',
@@ -71,7 +71,7 @@ const plansData = [
     credits: '100 credits',
     desc: 'For large-scale operations',
     features: [
-      '2000 AI credits per month',
+      '100 AI credits per month',
       '24/7 dedicated support',
       'Fastest processing',
       'Custom integrations',
