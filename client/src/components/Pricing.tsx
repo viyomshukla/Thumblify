@@ -36,8 +36,8 @@ const Title = ({ title, heading, description }) => (
 const plansData = [
   {
     name: 'Starter',
-    price: '₹499',
-    credits: '100 credits',
+    price: '₹299',
+    credits: '50 credits',
     desc: 'Perfect for small projects and testing',
     features: [
       '100 AI credits per month',
@@ -46,13 +46,13 @@ const plansData = [
       'Email notifications'
     ],
     popular: false,
-    amount: 499,
-    creditsToAdd: 100
+    amount: 299,
+    creditsToAdd: 50
   },
   {
     name: 'Professional',
-    price: '₹999',
-    credits: '500 credits',
+    price: '₹499',
+    credits: '75 credits',
     desc: 'Great for growing teams',
     features: [
       '500 AI credits per month',
@@ -62,13 +62,13 @@ const plansData = [
       'API access'
     ],
     popular: true,
-    amount: 999,
-    creditsToAdd: 500
+    amount: 499,
+    creditsToAdd: 75
   },
   {
     name: 'Enterprise',
-    price: '₹2,499',
-    credits: '2000 credits',
+    price: '₹899',
+    credits: '100 credits',
     desc: 'For large-scale operations',
     features: [
       '2000 AI credits per month',
@@ -79,8 +79,8 @@ const plansData = [
       'White-label options'
     ],
     popular: false,
-    amount: 2499,
-    creditsToAdd: 2000
+    amount: 899,
+    creditsToAdd: 100
   }
 ];
 
