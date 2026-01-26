@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thumblify Extension</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M23 7l-7 5 7 5V7z"></path>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+        <h1>Thumblify</h1>
+      </div>
+      <div class="credits" id="credits-display">
+        <span class="credits-label">Credits:</span>
+        <span class="credits-value" id="credits-value">--</span>
+      </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="status-container"></div>
+
+    <!-- Not Logged In -->
+    <div id="not-logged-in" class="hidden">
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <h3>Please Login</h3>
+        <p>You need to be logged in to use Thumblify</p>
+        <button class="btn-primary" id="login-btn">
+          Login to Thumblify
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="hidden">
+      <!-- Video Detection Status -->
+      <div class="detection-status" id="detection-status">
+        <div class="status-icon">
+          <div class="spinner"></div>
+        </div>
+        <p>Detecting video...</p>
+      </div>
+
+      <!-- Video Found -->
+      <div id="video-found" class="hidden">
+        <div class="video-info">
+          <div class="video-thumbnail" id="video-preview"></div>
+          <div class="video-details">
+            <p class="video-title" id="video-title">Video detected</p>
+            <p class="video-url" id="video-url"></p>
+          </div>
+        </div>
+
+        <!-- Capture Button -->
+        <button class="btn-capture" id="capture-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          Capture Frame
+        </button>
+
+        <!-- Model Selection -->
+        <div class="model-selection">
+          <label>Enhancement Model:</label>
+          <div class="model-options">
+            <label class="radio-card">
+              <input type="radio" name="model" value="basic" checked>
+              <div class="radio-content">
+                <span class="model-name">Basic</span>
+                <span class="model-credits">5 credits</span>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="model" value="premium">
+              <div class="radio-content">
+                <span class="model-name">Premium</span>
+                <span class="model-credits">10 credits</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Additional Options -->
+        <div class="options">
+          <label class="checkbox-label">
+            <input type="checkbox" id="auto-enhance" checked>
+            <span>Auto-enhance with AI</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- No Video Found -->
+      <div id="no-video" class="hidden">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <h3>No Video Detected</h3>
+          <p>Navigate to a page with a video to capture frames</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <a href="http://localhost:5173" target="_blank" class="footer-link">
+        Open Thumblify
+      </a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -9,7 +9,9 @@ import Authrouter from './routes/authroutes.js';
 import ThumbnailRouter from './routes/ThumbnailRoutes.js';
 import UserRouter from './routes/userroutes.js';
 import PaymentRouter from './routes/paymentRoutes.js';
-
+import ChatRouter from './routes/chatRoutes.js';
+import YoutubeRouter from './routes/youtubeRoutes.js';
+import WhatsappRouter from './routes/whatsappRoutes.js';
 dotenv.config();
 
 console.log('Routes loaded successfully');
@@ -29,7 +31,8 @@ app.use(cors({
   credentials:true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // For JSON payloads
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ✅ Session configuration (MUST be before passport)
 app.use(session({
@@ -64,7 +67,9 @@ app.use("/api/auth", Authrouter);
 app.use("/api/thumbnail", ThumbnailRouter);
 app.use("/api/user", UserRouter);
 app.use("/api/payment", PaymentRouter);
-
+app.use("/api/chat", ChatRouter);
+app.use("/api/youtube", YoutubeRouter);
+app.use("/api/whatsapp", WhatsappRouter);
 // Catch-all for 404s - MUST BE LAST
 app.use((req, res) => {
   console.log("❌ 404 - Route not found");

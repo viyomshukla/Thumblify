@@ -8,6 +8,7 @@ import LenisScroll from './components/lenis';
 import UserProfile from './pages/userInformation';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import ThumbnailEditor from './pages/editor';
 // In your App.tsx or main component
 import { useEffect } from 'react';
 import authAPI from './utils/api';
@@ -33,6 +34,7 @@ function App() {
 					<Route path="/generate/:id?" element={<><Generate /><Footer /></>} />
 					<Route path="/community" element={<><Community /><Footer /></>} />
 					<Route path="/about" element={<><UserProfile /><Footer /></>} />
+					<Route path="/editor" element={<><ThumbnailEditor /><Footer /></>} />
 				</Routes>
 			</BrowserRouter>
 		</AuthProvider>

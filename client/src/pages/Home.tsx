@@ -4,7 +4,7 @@ import Features from "../components/Features";
 import Pricing from "../components/Pricing";
 import Faq from "../components/Faq";
 import CTA from "../components/CTA";
-
+import Features2 from "../components/Feature2";
 export default function Home() {
     useEffect(() => {
         // Handle hash navigation on page load and hash changes
@@ -36,8 +36,9 @@ export default function Home() {
             <Hero />
             <Features />
             <Pricing />
+            <Features2 />
             <Faq />
             <CTA />
-        </>
+       </>
     )
 }

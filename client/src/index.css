@@ -35,7 +35,9 @@
     display: inline-flex;
     animation: marquee 16s linear infinite;
 }
-
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
 @keyframes float {
     0% {
         transform: translateY(0);

@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Thumblify - AI Thumbnail Generator",
+  "version": "1.0.0",
+  "description": "Capture video frames and generate AI-powered thumbnails instantly",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:5000/*",
+    "https://your-backend-url.com/*",
+    "*://*.youtube.com/*",
+    "*://*.vimeo.com/*",
+    "*://*.dailymotion.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.vimeo.com/*",
+        "*://*.dailymotion.com/*",
+        "*://*/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ]
+}

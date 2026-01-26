@@ -23,35 +23,60 @@ import {
   Crown,
   Download,
   ArrowRight,
+  FileText,
+  Youtube,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { thumbnailAPI } from "../utils/api";
+import DropdownChatbot from "../components/AIChatbot";
+import WhatsAppConnectModal from "../components/WhatsAppConnectModal";
+import { MessageCircle } from "lucide-react";
+
 
 const styleDescriptions: Record<ThumbnailStyle, string> = {
   "Bold & Graphic": "High contrast, bold typography, striking visuals",
   Minimalist: "Clean lines, simple composition, subtle colors",
   Photorealistic: "Lifelike imagery, natural lighting, authentic feel",
   Illustrated: "Artistic illustrations, creative designs, hand-drawn style",
-  "Tech/Futuristic": "Modern tech aesthetics, futuristic elements, digital vibes",
+  "Tech/Futuristic":
+    "Modern tech aesthetics, futuristic elements, digital vibes",
 };
 
 const Generate = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
+
+  // Mode selection
+  const [mode, setMode] = useState<"text" | "youtube">("text");
+
+  // Common fields
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
-  const [thumbnailStyle, setThumbnailStyle] = useState<ThumbnailStyle>("Bold & Graphic");
-  const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme>(colorSchemes[0]);
+  const [thumbnailStyle, setThumbnailStyle] =
+    useState<ThumbnailStyle>("Bold & Graphic");
+  const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme>(
+    colorSchemes[0],
+  );
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<"basic" | "premium">("basic");
-  const [uploadedPhoto, setUploadedPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
   const [insufficientCredits, setInsufficientCredits] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+
+  // Text mode specific
+  const [title, setTitle] = useState("");
+  const [uploadedPhoto, setUploadedPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // YouTube mode specific
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [analyzedThumbnail, setAnalyzedThumbnail] = useState<string | null>(
+    null,
+  );
+  const [analyzing, setAnalyzing] = useState(false);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,9 +101,54 @@ const Generate = () => {
 
   const { user, updateCredits } = useAuth();
 
+  const handleAnalyzeYoutube = async () => {
+    if (!youtubeUrl) {
+      alert("Please enter a YouTube URL");
+      return;
+    }
+
+    setAnalyzing(true);
+    setAnalyzedThumbnail(null);
+
+    try {
+      console.log("🔍 Analyzing YouTube video:", youtubeUrl);
+
+      const response = await thumbnailAPI.analyzeYoutube(youtubeUrl);
+
+      console.log("✅ Analysis Response:", response.data);
+
+      if (response.data && response.data.thumbnailUrl) {
+        setAnalyzedThumbnail(response.data.thumbnailUrl);
+        console.log("✅ YouTube thumbnail loaded:", response.data.thumbnailUrl);
+      } else {
+        throw new Error("Invalid response format - missing thumbnail URL");
+      }
+    } catch (error: any) {
+      console.error("❌ Analysis Error:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to analyze YouTube video. Please try again.";
+      alert(errorMessage);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!user) {
       alert("Please login first");
+      return;
+    }
+
+    if (mode === "text" && !title) {
+      alert("Please enter a title");
+      return;
+    }
+
+    if (mode === "youtube" && !youtubeUrl) {
+      alert("Please enter a YouTube URL");
       return;
     }
 
@@ -91,50 +161,77 @@ const Generate = () => {
     }
 
     setLoading(true);
-    setThumbnail(null); // ✅ Clear previous thumbnail
-    setInsufficientCredits(false); // ✅ Reset flag
-    
-    try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("prompt", additionalDetails);
-      formData.append("color_scheme", selectedColorScheme.id);
-      formData.append("aspectRatio", aspectRatio);
-      formData.append("style", thumbnailStyle);
-      formData.append("text_overlay", "true");
-      formData.append("additionalDetails", additionalDetails);
-      formData.append("model", model);
+    setThumbnail(null);
+    setInsufficientCredits(false);
 
-      if (uploadedPhoto) {
-        formData.append("image", uploadedPhoto);
+    try {
+      let response;
+
+      if (mode === "text") {
+        // Text mode - generate from scratch
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("prompt", additionalDetails);
+        formData.append("color_scheme", selectedColorScheme.id);
+        formData.append("aspectRatio", aspectRatio);
+        formData.append("style", thumbnailStyle);
+        formData.append("text_overlay", "true");
+        formData.append("additionalDetails", additionalDetails);
+        formData.append("model", model);
+
+        if (uploadedPhoto) {
+          formData.append("image", uploadedPhoto);
+        }
+
+        console.log("🚀 Sending text generation request...");
+        console.log("📝 Title:", title);
+        console.log("🎨 Style:", thumbnailStyle);
+        console.log("🎨 Color Scheme:", selectedColorScheme.id);
+        console.log("📐 Aspect Ratio:", aspectRatio);
+        console.log("💳 Model:", model);
+        console.log("📸 Has Photo:", !!uploadedPhoto);
+
+        response = await thumbnailAPI.generate(formData);
+      } else {
+        // YouTube mode - improve existing thumbnail
+        const improveData = {
+          youtubeUrl,
+          color_scheme: selectedColorScheme.id,
+          aspectRatio,
+          style: thumbnailStyle,
+          additionalDetails,
+          model,
+        };
+
+        console.log("🚀 Sending YouTube improvement request...");
+        console.log("🎬 YouTube URL:", youtubeUrl);
+        console.log("🎨 Style:", thumbnailStyle);
+        console.log("🎨 Color Scheme:", selectedColorScheme.id);
+        console.log("📐 Aspect Ratio:", aspectRatio);
+        console.log("💳 Model:", model);
+
+        response = await thumbnailAPI.improveYoutube(improveData);
       }
 
-      console.log("🚀 Sending generation request...");
-      console.log("📝 Title:", title);
-      console.log("🎨 Style:", thumbnailStyle);
-      console.log("🎨 Color Scheme:", selectedColorScheme.id);
-      console.log("📐 Aspect Ratio:", aspectRatio);
-      console.log("💳 Model:", model);
-      console.log("📸 Has Photo:", !!uploadedPhoto);
-
-      const response = await thumbnailAPI.generate(formData);
-      
       console.log("✅ Full Response:", response);
       console.log("✅ Response Data:", response.data);
-      
-      if (response.data && response.data.thumbnail && response.data.thumbnail.image_url) {
+
+      if (
+        response.data &&
+        response.data.thumbnail &&
+        response.data.thumbnail.image_url
+      ) {
         setThumbnail(response.data.thumbnail.image_url);
         setCreditsRemaining(response.data.creditsRemaining);
         await updateCredits();
         setShowSuccessDialog(true);
-        
+
         console.log("✅ Thumbnail URL:", response.data.thumbnail.image_url);
         console.log("💰 Credits Remaining:", response.data.creditsRemaining);
       } else {
         console.error("❌ Invalid response structure:", response.data);
         throw new Error("Invalid response format - missing thumbnail data");
       }
-
     } catch (error: any) {
       console.error("❌ Generation Error:", error);
       console.error("❌ Error Response:", error.response);
@@ -142,13 +239,13 @@ const Generate = () => {
       console.error("❌ Error Status:", error.response?.status);
       console.error("❌ Error Headers:", error.response?.headers);
       console.error("❌ Error Message:", error.message);
-      
-      const errorMessage = 
-        error.response?.data?.message || 
-        error.response?.data?.error || 
-        error.message || 
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
         "Failed to generate thumbnail. Please try again.";
-      
+
       alert(errorMessage);
     } finally {
       setLoading(false);
@@ -165,10 +262,22 @@ const Generate = () => {
     setShowSuccessDialog(false);
     setThumbnail(null);
     setTitle("");
+    setYoutubeUrl("");
     setAdditionalDetails("");
     setUploadedPhoto(null);
     setPhotoPreview(null);
+    setAnalyzedThumbnail(null);
     setCreditsRemaining(null);
+  };
+
+  const handleModeChange = (newMode: "text" | "youtube") => {
+    setMode(newMode);
+    setThumbnail(null);
+    setAnalyzedThumbnail(null);
+    setTitle("");
+    setYoutubeUrl("");
+    setUploadedPhoto(null);
+    setPhotoPreview(null);
   };
 
   useEffect(() => {
@@ -206,37 +315,158 @@ const Generate = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Panel: Create Your Thumbnail Form */}
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  {id ? "Edit Thumbnail" : "Create Your Thumbnail"}
-                </h2>
-                <p className="text-gray-400 text-sm">
-                  Describe your vision and let AI bring it to life
-                </p>
+              
+                  <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    {id ? "Edit Thumbnail" : "Create Your Thumbnail"}
+                  </h2>
+                  <p className="text-gray-400 text-sm">
+                    Describe your vision and let AI bring it to life
+                  </p>
+                  {user && (
+                    <div className="mt-2 text-sm">
+                      <span className="text-yellow-400">Credits: {user.credits}</span>
+                    </div>
+                  )}  
+                </div>
+
+                {/* ✅ Chatbot Integration for authorized users only */}
                 {user && (
-                  <div className="mt-2 text-sm">
-                    <span className="text-yellow-400">
-                      Credits: {user.credits}
-                    </span>
+                  <div className="flex-shrink-0">
+                    <DropdownChatbot />
                   </div>
                 )}
               </div>
 
-              {/* Title Input */}
+              {/* Mode Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Title or Topic
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Generation Mode
                 </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., 10 Tips for Better Sleep"
-                  maxLength={100}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
-                />
-                <p className="text-xs text-gray-500 mt-1">{title.length}/100</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleModeChange("text")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition ${
+                      mode === "text"
+                        ? "bg-indigo-500/20 border-indigo-500 text-white"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="text-sm font-medium">From Text</span>
+                  </button>
+                  <button
+                    onClick={() => handleModeChange("youtube")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition ${
+                      mode === "youtube"
+                        ? "bg-indigo-500/20 border-indigo-500 text-white"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"
+                    }`}
+                  >
+                    <Youtube className="w-4 h-4" />
+                    <span className="text-sm font-medium">From YouTube</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Conditional Input Fields Based on Mode */}
+              {mode === "text" ? (
+                <>
+                  {/* Title Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Title or Topic
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g., 10 Tips for Better Sleep"
+                      maxLength={100}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {title.length}/100
+                    </p>
+                  </div>
+
+                  {/* Photo Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Upload Photo (optional)
+                    </label>
+                    {!photoPreview ? (
+                      <label className="flex flex-col items-center justify-center w-full h-32 px-4 py-6 border-2 border-dashed border-white/20 rounded-xl cursor-pointer bg-white/5 hover:bg-white/10 transition">
+                        <div className="flex flex-col items-center justify-center">
+                          <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-400">
+                            <span className="font-medium text-indigo-400">
+                              Click to upload
+                            </span>{" "}
+                            or drag and drop
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            PNG, JPG, GIF up to 10MB
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                        />
+                      </label>
+                    ) : (
+                      <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10">
+                        <img
+                          src={photoPreview}
+                          alt="Uploaded photo"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={handleRemovePhoto}
+                          className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black/90 rounded-full text-white transition"
+                          aria-label="Remove photo"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                          <p className="text-xs text-white truncate">
+                            {uploadedPhoto?.name}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* YouTube URL Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      YouTube Video URL
+                    </label>
+                    <input
+                      type="text"
+                      value={youtubeUrl}
+                      onChange={(e) => setYoutubeUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                  </div>
+
+                  {/* Analyze Button */}
+                  <button
+                    onClick={handleAnalyzeYoutube}
+                    disabled={!youtubeUrl || analyzing}
+                    className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-medium transition flex items-center justify-center gap-2"
+                  >
+                    <Youtube className="w-5 h-5" />
+                    {analyzing ? "Analyzing..." : "Analyze YouTube Thumbnail"}
+                  </button>
+                </>
+              )}
 
               {/* Aspect Ratio Selection */}
               <div>
@@ -256,7 +486,9 @@ const Generate = () => {
                     >
                       {ratio === "16:9" && <Monitor className="w-4 h-4" />}
                       {ratio === "1:1" && <Square className="w-4 h-4" />}
-                      {ratio === "9:16" && <RectangleVertical className="w-4 h-4" />}
+                      {ratio === "9:16" && (
+                        <RectangleVertical className="w-4 h-4" />
+                      )}
                       <span className="text-sm font-medium">{ratio}</span>
                     </button>
                   ))}
@@ -366,73 +598,52 @@ const Generate = () => {
                 </div>
               </div>
 
-              {/* Photo Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Upload Photo (optional)
-                </label>
-                {!photoPreview ? (
-                  <label className="flex flex-col items-center justify-center w-full h-32 px-4 py-6 border-2 border-dashed border-white/20 rounded-xl cursor-pointer bg-white/5 hover:bg-white/10 transition">
-                    <div className="flex flex-col items-center justify-center">
-                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-400">
-                        <span className="font-medium text-indigo-400">
-                          Click to upload
-                        </span>{" "}
-                        or drag and drop
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        PNG, JPG, GIF up to 10MB
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                    />
+              {/* Additional Details */}
+              {/* Additional Details */}
+              {/* Additional Details */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Additional Details (optional)
                   </label>
-                ) : (
-                  <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10">
-                    <img
-                      src={photoPreview}
-                      alt="Uploaded photo"
-                      className="w-full h-full object-cover"
-                    />
+                  <textarea
+                    value={additionalDetails}
+                    onChange={(e) => setAdditionalDetails(e.target.value)}
+                    placeholder="Add any specific elements, mood, or style preferences..."
+                    rows={4}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition resize-none"
+                  />
+                </div>
+
+                {/* ✅ Only show the WhatsApp button if user is authenticated */}
+                {user && (
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                      onClick={handleRemovePhoto}
-                      className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black/90 rounded-full text-white transition"
-                      aria-label="Remove photo"
+                      type="button"
+                      onClick={() => setShowWhatsAppModal(true)}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition flex-1"
                     >
-                      <X className="w-4 h-4" />
+                      <MessageCircle className="w-5 h-5" />
+                      Connect WhatsApp
                     </button>
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                      <p className="text-xs text-white truncate">
-                        {uploadedPhoto?.name}
-                      </p>
-                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Additional Details */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Additional Details (optional)
-                </label>
-                <textarea
-                  value={additionalDetails}
-                  onChange={(e) => setAdditionalDetails(e.target.value)}
-                  placeholder="Add any specific elements, mood, or style preferences..."
-                  rows={4}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition resize-none"
+                {/* WhatsApp Modal */}
+                <WhatsAppConnectModal
+                  isOpen={showWhatsAppModal}
+                  onClose={() => setShowWhatsAppModal(false)}
                 />
               </div>
 
               {/* Generate Button */}
               <PrimaryButton
                 onClick={handleGenerate}
-                disabled={!title || loading}
+                disabled={
+                  (mode === "text" && !title) ||
+                  (mode === "youtube" && !youtubeUrl) ||
+                  loading
+                }
                 className="w-full"
               >
                 {loading
@@ -461,7 +672,13 @@ const Generate = () => {
                     alt="Generated thumbnail"
                     className="w-full h-full object-cover rounded-xl"
                   />
-                ) : photoPreview ? (
+                ) : mode === "youtube" && analyzedThumbnail ? (
+                  <img
+                    src={analyzedThumbnail}
+                    alt="YouTube thumbnail"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : mode === "text" && photoPreview ? (
                   <img
                     src={photoPreview}
                     alt="Uploaded reference"
@@ -472,17 +689,137 @@ const Generate = () => {
                     <ImageIcon className="w-16 h-16 text-gray-500 mx-auto" />
                     <div className="space-y-1">
                       <p className="text-white font-medium">
-                        Generate your first thumbnail
+                        {mode === "youtube"
+                          ? "Recreate your YouTube thumbnail"
+                          : "Generate your first thumbnail"}
                       </p>
                       <p className="text-gray-400 text-sm">
-                        Fill out the form and click Generate
+                        {mode === "youtube"
+                          ? "Enter a YouTube URL and click Analyze"
+                          : "Fill out the form and click Generate"}
                       </p>
                     </div>
                   </div>
                 )}
-                {loading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+
+                {(loading || analyzing) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+                    <p className="text-white font-medium">
+                      {analyzing ? "Thumbnail Loading..." : "Generating..."}
+                    </p>
+                  </div>
+                )}
+              {/* </div>
+              <br />
+              <br/>
+              <div
+                className={`relative w-full border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center bg-white/5 transition-all duration-300 ${
+                  aspectRatio === "16:9"
+                    ? "aspect-video"
+                    : aspectRatio === "1:1"
+                      ? "aspect-square"
+                      : "aspect-[9/16]"
+                }`}
+              >
+                {thumbnail ? (
+                  <img
+                    src={thumbnail}
+                    alt="Generated thumbnail"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : mode === "youtube" && analyzedThumbnail ? (
+                  <img
+                    src={analyzedThumbnail}
+                    alt="YouTube thumbnail"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : mode === "text" && photoPreview ? (
+                  <img
+                    src={photoPreview}
+                    alt="Uploaded reference"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : (
+                  <div className="text-center space-y-4">
+                    <ImageIcon className="w-16 h-16 text-gray-500 mx-auto" />
+                    <div className="space-y-1">
+                      <p className="text-white font-medium">
+                        {mode === "youtube"
+                          ? "Recreate your YouTube thumbnail"
+                          : "Generate your first thumbnail"}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        {mode === "youtube"
+                          ? "Enter a YouTube URL and click Analyze"
+                          : "Fill out the form and click Generate"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {(loading || analyzing) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+                    <p className="text-white font-medium">
+                      {analyzing ? "Thumbnail Loading..." : "Generating..."}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <br />
+              <br/>
+              <div
+                className={`relative w-full border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center bg-white/5 transition-all duration-300 ${
+                  aspectRatio === "16:9"
+                    ? "aspect-video"
+                    : aspectRatio === "1:1"
+                      ? "aspect-square"
+                      : "aspect-[9/16]"
+                }`}
+              >
+                {thumbnail ? (
+                  <img
+                    src={thumbnail}
+                    alt="Generated thumbnail"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : mode === "youtube" && analyzedThumbnail ? (
+                  <img
+                    src={analyzedThumbnail}
+                    alt="YouTube thumbnail"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : mode === "text" && photoPreview ? (
+                  <img
+                    src={photoPreview}
+                    alt="Uploaded reference"
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : (
+                  <div className="text-center space-y-4">
+                    <ImageIcon className="w-16 h-16 text-gray-500 mx-auto" />
+                    <div className="space-y-1">
+                      <p className="text-white font-medium">
+                        {mode === "youtube"
+                          ? "Recreate your YouTube thumbnail"
+                          : "Generate your first thumbnail"}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        {mode === "youtube"
+                          ? "Enter a YouTube URL and click Analyze"
+                          : "Fill out the form and click Generate"}
+                      </p>
+                    </div>
+                  </div> */}
+                {/* )} */}
+
+                {(loading || analyzing) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+                    <p className="text-white font-medium">
+                      {analyzing ? "Thumbnail Loading..." : "Generating..."}
+                    </p>
                   </div>
                 )}
               </div>
@@ -505,7 +842,8 @@ const Generate = () => {
                     Insufficient Credits
                   </h3>
                   <p className="text-gray-400">
-                    You need {model === "premium" ? "10" : "5"} credits to generate this thumbnail.
+                    You need {model === "premium" ? "10" : "5"} credits to
+                    generate this thumbnail.
                   </p>
                 </>
               ) : (

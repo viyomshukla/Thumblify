@@ -7,20 +7,6 @@ const api = axios.create({
   withCredentials: true, // This sends cookies automatically
 });
 
-// ❌ REMOVE THIS - You don't need it with cookie auth
-// api.interceptors.request.use(
-//   (config) => {
-//     const token = localStorage.getItem('token');
-//     if (token) {
-//       config.headers.Authorization = `Bearer ${token}`;
-//     }
-//     return config;
-//   },
-//   (error) => {
-//     return Promise.reject(error);
-//   }
-// );
-
 // ✅ OPTIONAL: Add response interceptor for better error handling
 api.interceptors.response.use(
   (response) => response,
@@ -55,6 +41,13 @@ export const thumbnailAPI = {
     return api.post('/thumbnail/generate', data);
   },
   delete: (id: string) => api.delete(`/thumbnail/delete/${id}`),
+  
+  // YouTube APIs
+  analyzeYoutube: (youtubeUrl: string) => 
+    api.post('/youtube/analyze', { youtubeUrl }),
+    
+  improveYoutube: (data: any) => 
+    api.post('/youtube/improve', data),
 };
 
 // User APIs
@@ -62,6 +55,23 @@ export const userAPI = {
   getThumbnails: () => api.get('/user/thumbnails'),
   getThumbnail: (id: string) => api.get(`/user/thumbnails/${id}`),
   getCredits: () => api.get('/user/credits'),
+};
+
+// Chat APIs
+export const chatAPI = {
+  sendMessage: (message: string, conversationHistory?: any[]) => 
+    api.post('/chat/message', { message, conversationHistory }),
+};
+// WhatsApp APIs
+export const whatsappAPI = {
+  connect: (phoneNumber: string) => 
+    api.post('/whatsapp/connect', { phoneNumber }),
+  
+  disconnect: () => 
+    api.post('/whatsapp/disconnect'),
+  
+  getStatus: () => 
+    api.get('/whatsapp/status'),
 };
 
 export default api;

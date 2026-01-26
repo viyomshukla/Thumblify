@@ -8,6 +8,7 @@ import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 
 
+
 export default function Navbar() {
     const { user, logout } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
@@ -41,7 +42,8 @@ export default function Navbar() {
         { name: 'Generate', href: '/generate' },
         { name: 'My Generation', href: '/community' },
         { name: 'Pricing', href: '/#pricing', isFAQ: true },
-        { name: 'User', href: '/about' },
+        {name: 'Thumbnail Editor', href: '/editor'},
+        { name: 'User', href: '/about' }
     ];
 
     return (
