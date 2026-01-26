@@ -110,15 +110,15 @@ export default function Features2() {
     
     {
       icon: Zap,
-      title: 'Lightning Fast',
-      description: 'Get your thumbnails in 10-20 seconds. No waiting, no delays, just instant results.',
+      title: 'Chrome Extension',
+      description: 'Generate thumbnails directly from YouTube Studio with our easy-to-use Chrome extension.',
       color: 'from-indigo-400 to-purple-600',
       bgColor: 'bg-indigo-500/10',
       borderColor: 'border-indigo-500/20',
       highlights: [
-        'Basic: 10 seconds',
-        'Premium: 15-20 seconds',
-        'Real-time preview'
+        'One-click thumbnail generation',
+        'Seamless YouTube Studio integration',
+        'Save time and effort'
       ]
     }
   ];
