@@ -73,6 +73,17 @@ const ThumbnailSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    model_used: {
+      type: String,
+      default: "Gemini Flash",
+    },
+    prompt_style: {
+      type: String,
+    },
+    is_favorite: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

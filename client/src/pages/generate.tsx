@@ -25,21 +25,20 @@ import {
   ArrowRight,
   FileText,
   Youtube,
+  Star,
+  MessageCircle,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { thumbnailAPI } from "../utils/api";
 import DropdownChatbot from "../components/AIChatbot";
 import WhatsAppConnectModal from "../components/WhatsAppConnectModal";
-import { MessageCircle } from "lucide-react";
-
 
 const styleDescriptions: Record<ThumbnailStyle, string> = {
   "Bold & Graphic": "High contrast, bold typography, striking visuals",
   Minimalist: "Clean lines, simple composition, subtle colors",
   Photorealistic: "Lifelike imagery, natural lighting, authentic feel",
   Illustrated: "Artistic illustrations, creative designs, hand-drawn style",
-  "Tech/Futuristic":
-    "Modern tech aesthetics, futuristic elements, digital vibes",
+  "Tech/Futuristic": "Modern tech aesthetics, futuristic elements, digital vibes",
 };
 
 const Generate = () => {
@@ -51,14 +50,13 @@ const Generate = () => {
 
   // Common fields
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
-  const [thumbnailStyle, setThumbnailStyle] =
-    useState<ThumbnailStyle>("Bold & Graphic");
-  const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme>(
-    colorSchemes[0],
-  );
+  const [thumbnailStyle, setThumbnailStyle] = useState<ThumbnailStyle>("Bold & Graphic");
+  const [selectedColorScheme, setSelectedColorScheme] = useState<ColorScheme>(colorSchemes[0]);
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
-  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<Array<{image_url: string, model: string, model_id: string, prompt_used: string}>>([]);
+  const [savedPreviews, setSavedPreviews] = useState<Set<string>>(new Set());
+  const [savingModel, setSavingModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<"basic" | "premium">("basic");
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -73,9 +71,7 @@ const Generate = () => {
 
   // YouTube mode specific
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [analyzedThumbnail, setAnalyzedThumbnail] = useState<string | null>(
-    null,
-  );
+  const [analyzedThumbnail, setAnalyzedThumbnail] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,9 +108,7 @@ const Generate = () => {
 
     try {
       console.log("🔍 Analyzing YouTube video:", youtubeUrl);
-
       const response = await thumbnailAPI.analyzeYoutube(youtubeUrl);
-
       console.log("✅ Analysis Response:", response.data);
 
       if (response.data && response.data.thumbnailUrl) {
@@ -152,7 +146,7 @@ const Generate = () => {
       return;
     }
 
-    const requiredCredits = model === "premium" ? 10 : 5;
+    const requiredCredits = model === "premium" ? 20 : 10;
 
     if (user.credits < requiredCredits) {
       setInsufficientCredits(true);
@@ -161,14 +155,33 @@ const Generate = () => {
     }
 
     setLoading(true);
-    setThumbnail(null);
+    setPreviews([]);
+    setSavedPreviews(new Set());
     setInsufficientCredits(false);
 
     try {
-      let response;
+      const onPreview = (preview: any) => {
+        console.log(`🖼️ Received preview from ${preview.model}`);
+        setPreviews((prev) => [...prev, preview]);
+      };
+
+      const onDone = (info: any) => {
+        console.log("✅ All models finished:", info);
+        setCreditsRemaining(info.creditsRemaining);
+        updateCredits();
+        setLoading(false);
+        if (info.generatedCount > 0) {
+          setShowSuccessDialog(true);
+        }
+      };
+
+      const onError = (msg: string) => {
+        console.error("❌ SSE Error:", msg);
+        setLoading(false);
+        alert(msg);
+      };
 
       if (mode === "text") {
-        // Text mode - generate from scratch
         const formData = new FormData();
         formData.append("title", title);
         formData.append("prompt", additionalDetails);
@@ -183,17 +196,9 @@ const Generate = () => {
           formData.append("image", uploadedPhoto);
         }
 
-        console.log("🚀 Sending text generation request...");
-        console.log("📝 Title:", title);
-        console.log("🎨 Style:", thumbnailStyle);
-        console.log("🎨 Color Scheme:", selectedColorScheme.id);
-        console.log("📐 Aspect Ratio:", aspectRatio);
-        console.log("💳 Model:", model);
-        console.log("📸 Has Photo:", !!uploadedPhoto);
-
-        response = await thumbnailAPI.generate(formData);
+        console.log("🚀 Starting SSE text generation...");
+        await thumbnailAPI.generateStream(formData, onPreview, onDone, onError);
       } else {
-        // YouTube mode - improve existing thumbnail
         const improveData = {
           youtubeUrl,
           color_scheme: selectedColorScheme.id,
@@ -203,64 +208,52 @@ const Generate = () => {
           model,
         };
 
-        console.log("🚀 Sending YouTube improvement request...");
-        console.log("🎬 YouTube URL:", youtubeUrl);
-        console.log("🎨 Style:", thumbnailStyle);
-        console.log("🎨 Color Scheme:", selectedColorScheme.id);
-        console.log("📐 Aspect Ratio:", aspectRatio);
-        console.log("💳 Model:", model);
-
-        response = await thumbnailAPI.improveYoutube(improveData);
-      }
-
-      console.log("✅ Full Response:", response);
-      console.log("✅ Response Data:", response.data);
-
-      if (
-        response.data &&
-        response.data.thumbnail &&
-        response.data.thumbnail.image_url
-      ) {
-        setThumbnail(response.data.thumbnail.image_url);
-        setCreditsRemaining(response.data.creditsRemaining);
-        await updateCredits();
-        setShowSuccessDialog(true);
-
-        console.log("✅ Thumbnail URL:", response.data.thumbnail.image_url);
-        console.log("💰 Credits Remaining:", response.data.creditsRemaining);
-      } else {
-        console.error("❌ Invalid response structure:", response.data);
-        throw new Error("Invalid response format - missing thumbnail data");
+        console.log("🚀 Starting SSE YouTube improvement...");
+        await thumbnailAPI.improveYoutubeStream(improveData, onPreview, onDone, onError);
       }
     } catch (error: any) {
       console.error("❌ Generation Error:", error);
-      console.error("❌ Error Response:", error.response);
-      console.error("❌ Error Data:", error.response?.data);
-      console.error("❌ Error Status:", error.response?.status);
-      console.error("❌ Error Headers:", error.response?.headers);
-      console.error("❌ Error Message:", error.message);
-
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to generate thumbnail. Please try again.";
-
-      alert(errorMessage);
-    } finally {
+      alert("Failed to generate thumbnails. Please try again.");
       setLoading(false);
     }
   };
 
-  const handleDownload = () => {
-    if (thumbnail) {
-      window.open(thumbnail, "_blank");
+  const handleDownload = (url?: string) => {
+    const downloadUrl = url || (previews.length > 0 ? previews[0].image_url : null);
+    if (downloadUrl) {
+      window.open(downloadUrl, "_blank");
+    }
+  };
+
+  const handleSavePreview = async (preview: {image_url: string, model: string, model_id: string, prompt_used: string}) => {
+    try {
+      setSavingModel(preview.model_id);
+      await thumbnailAPI.save({
+        image_url: preview.image_url,
+        model: preview.model,
+        prompt_used: preview.prompt_used,
+        title: title || `YouTube Thumbnail`,
+        color_scheme: selectedColorScheme.id,
+        aspectRatio: aspectRatio,
+        style: thumbnailStyle,
+        additionalDetails,
+        model_id: preview.model_id,
+        prompt_style: (preview as any).prompt_style,
+      });
+      setSavedPreviews(prev => new Set([...prev, preview.model_id]));
+      console.log(`✅ Saved ${preview.model} thumbnail`);
+    } catch (error: any) {
+      console.error("❌ Save Error:", error);
+      alert(error.response?.data?.message || "Failed to save thumbnail");
+    } finally {
+      setSavingModel(null);
     }
   };
 
   const handleGenerateAnother = () => {
     setShowSuccessDialog(false);
-    setThumbnail(null);
+    setPreviews([]);
+    setSavedPreviews(new Set());
     setTitle("");
     setYoutubeUrl("");
     setAdditionalDetails("");
@@ -272,7 +265,8 @@ const Generate = () => {
 
   const handleModeChange = (newMode: "text" | "youtube") => {
     setMode(newMode);
-    setThumbnail(null);
+    setPreviews([]);
+    setSavedPreviews(new Set());
     setAnalyzedThumbnail(null);
     setTitle("");
     setYoutubeUrl("");
@@ -283,12 +277,12 @@ const Generate = () => {
   useEffect(() => {
     if (id) {
       setLoading(true);
-      const thumbnailData = dummyThumbnails.find(
-        (thumbnail) => thumbnail._id === id,
-      );
+      const thumbnailData = dummyThumbnails.find((t) => t._id === id);
 
       if (thumbnailData) {
-        setThumbnail(thumbnailData.image_url);
+        if (thumbnailData.image_url) {
+          setPreviews([{ image_url: thumbnailData.image_url, model: "loaded", model_id: "loaded", prompt_used: "" }]);
+        }
         setAdditionalDetails(thumbnailData.user_prompt || "");
         setTitle(thumbnailData.title);
 
@@ -308,6 +302,123 @@ const Generate = () => {
     }
   }, [id]);
 
+  // Helper function to render a single preview section
+  const renderPreviewSection = (preview?: {image_url: string, model: string, model_id: string, prompt_used: string}, index?: number) => {
+    const modelColors = {
+      "gemini": "bg-blue-500/80",
+      "flux": "bg-purple-500/80",
+      "dall-e": "bg-green-500/80"
+    };
+
+    return (
+      <div className="space-y-3">
+        {/* Model Name Header */}
+        {preview && (
+          <div className="flex items-center justify-between">
+            <span className={`px-3 py-1.5 text-xs font-bold uppercase rounded-lg ${
+              modelColors[preview.model_id as keyof typeof modelColors] || "bg-gray-500/80"
+            } text-white`}>
+              {preview.model}
+            </span>
+            {savedPreviews.has(preview.model_id) && (
+              <span className="px-2 py-1 text-[10px] font-bold uppercase rounded-lg bg-green-500/80 text-white flex items-center gap-1">
+                <Star className="w-3 h-3 fill-current" /> Saved
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Preview Container */}
+        <div
+          className={`relative w-full border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center bg-white/5 transition-all duration-300 ${
+            aspectRatio === "16:9"
+              ? "aspect-video"
+              : aspectRatio === "1:1"
+                ? "aspect-square"
+                : "aspect-[9/16]"
+          }`}
+        >
+          {preview ? (
+            <img
+              src={preview.image_url}
+              alt={`${preview.model} generated thumbnail`}
+              className="w-full h-full object-cover rounded-xl"
+            />
+          ) : mode === "youtube" && analyzedThumbnail && index === 0 ? (
+            <img
+              src={analyzedThumbnail}
+              alt="YouTube thumbnail"
+              className="w-full h-full object-cover rounded-xl"
+            />
+          ) : mode === "text" && photoPreview && index === 0 ? (
+            <img
+              src={photoPreview}
+              alt="Uploaded reference"
+              className="w-full h-full object-cover rounded-xl"
+            />
+          ) : (
+            <div className="text-center space-y-4 p-4">
+              <ImageIcon className="w-12 h-12 text-gray-500 mx-auto" />
+              <div className="space-y-1">
+                <p className="text-white font-medium text-sm">
+                  {mode === "youtube"
+                    ? "Recreate your YouTube thumbnail"
+                    : "Generate your first thumbnail"}
+                </p>
+                <p className="text-gray-400 text-xs">
+                  {mode === "youtube"
+                    ? "Enter URL and click Analyze"
+                    : "Fill form and click Generate"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {(loading || analyzing) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mb-3"></div>
+              <p className="text-white font-medium text-sm">
+                {analyzing ? "Thumbnail Loading..." : "Generating..."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons - Only show if preview exists */}
+        {preview && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSavePreview(preview)}
+              disabled={savedPreviews.has(preview.model_id) || savingModel === preview.model_id}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                savedPreviews.has(preview.model_id)
+                  ? "bg-green-600/20 border border-green-500/30 text-green-400 cursor-default"
+                  : savingModel === preview.model_id
+                    ? "bg-yellow-600/20 border border-yellow-500/30 text-yellow-400 cursor-wait"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              }`}
+            >
+              {savedPreviews.has(preview.model_id) ? (
+                <><Star className="w-4 h-4 fill-current" /> Saved</>
+              ) : savingModel === preview.model_id ? (
+                <>Saving...</>
+              ) : (
+                <><Star className="w-4 h-4" /> Save</>
+              )}
+            </button>
+
+            <button
+              onClick={() => handleDownload(preview.image_url)}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition"
+            >
+              <Download className="w-4 h-4" /> Download
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="min-h-screen pt-24 pb-12 px-4">
@@ -315,8 +426,7 @@ const Generate = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Panel: Create Your Thumbnail Form */}
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-6">
-              
-                  <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2">
                     {id ? "Edit Thumbnail" : "Create Your Thumbnail"}
@@ -328,10 +438,9 @@ const Generate = () => {
                     <div className="mt-2 text-sm">
                       <span className="text-yellow-400">Credits: {user.credits}</span>
                     </div>
-                  )}  
+                  )}
                 </div>
 
-                {/* ✅ Chatbot Integration for authorized users only */}
                 {user && (
                   <div className="flex-shrink-0">
                     <DropdownChatbot />
@@ -370,10 +479,9 @@ const Generate = () => {
                 </div>
               </div>
 
-              {/* Conditional Input Fields Based on Mode */}
+              {/* Conditional Input Fields */}
               {mode === "text" ? (
                 <>
-                  {/* Title Input */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Title or Topic
@@ -386,12 +494,9 @@ const Generate = () => {
                       maxLength={100}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {title.length}/100
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{title.length}/100</p>
                   </div>
 
-                  {/* Photo Upload */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Upload Photo (optional)
@@ -401,40 +506,23 @@ const Generate = () => {
                         <div className="flex flex-col items-center justify-center">
                           <Upload className="w-8 h-8 text-gray-400 mb-2" />
                           <p className="text-sm text-gray-400">
-                            <span className="font-medium text-indigo-400">
-                              Click to upload
-                            </span>{" "}
-                            or drag and drop
+                            <span className="font-medium text-indigo-400">Click to upload</span> or drag and drop
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            PNG, JPG, GIF up to 10MB
-                          </p>
+                          <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
                         </div>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                        />
+                        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                       </label>
                     ) : (
                       <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10">
-                        <img
-                          src={photoPreview}
-                          alt="Uploaded photo"
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={photoPreview} alt="Uploaded photo" className="w-full h-full object-cover" />
                         <button
                           onClick={handleRemovePhoto}
                           className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black/90 rounded-full text-white transition"
-                          aria-label="Remove photo"
                         >
                           <X className="w-4 h-4" />
                         </button>
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                          <p className="text-xs text-white truncate">
-                            {uploadedPhoto?.name}
-                          </p>
+                          <p className="text-xs text-white truncate">{uploadedPhoto?.name}</p>
                         </div>
                       </div>
                     )}
@@ -442,7 +530,6 @@ const Generate = () => {
                 </>
               ) : (
                 <>
-                  {/* YouTube URL Input */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       YouTube Video URL
@@ -456,7 +543,6 @@ const Generate = () => {
                     />
                   </div>
 
-                  {/* Analyze Button */}
                   <button
                     onClick={handleAnalyzeYoutube}
                     disabled={!youtubeUrl || analyzing}
@@ -468,11 +554,9 @@ const Generate = () => {
                 </>
               )}
 
-              {/* Aspect Ratio Selection */}
+              {/* Aspect Ratio */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Aspect Ratio
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Aspect Ratio</label>
                 <div className="flex gap-3">
                   {aspectRatios.map((ratio) => (
                     <button
@@ -486,20 +570,16 @@ const Generate = () => {
                     >
                       {ratio === "16:9" && <Monitor className="w-4 h-4" />}
                       {ratio === "1:1" && <Square className="w-4 h-4" />}
-                      {ratio === "9:16" && (
-                        <RectangleVertical className="w-4 h-4" />
-                      )}
+                      {ratio === "9:16" && <RectangleVertical className="w-4 h-4" />}
                       <span className="text-sm font-medium">{ratio}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Thumbnail Style Dropdown */}
+              {/* Thumbnail Style */}
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Thumbnail Style
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Thumbnail Style</label>
                 <button
                   onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white flex items-center justify-between hover:border-white/20 transition"
@@ -508,13 +588,9 @@ const Generate = () => {
                     <Zap className="w-4 h-4 text-blue-400" />
                     <span>{thumbnailStyle}</span>
                   </div>
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform ${isStyleDropdownOpen ? "rotate-180" : ""}`}
-                  />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isStyleDropdownOpen ? "rotate-180" : ""}`} />
                 </button>
-                <p className="text-xs text-gray-500 mt-1">
-                  {styleDescriptions[thumbnailStyle]}
-                </p>
+                <p className="text-xs text-gray-500 mt-1">{styleDescriptions[thumbnailStyle]}</p>
                 {isStyleDropdownOpen && (
                   <div className="absolute z-10 w-full mt-2 bg-white/10 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden">
                     {thumbnailStyles.map((style) => (
@@ -534,11 +610,9 @@ const Generate = () => {
                 )}
               </div>
 
-              {/* Color Scheme Selection */}
+              {/* Color Scheme */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Color Scheme
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Color Scheme</label>
                 <div className="grid grid-cols-5 gap-3">
                   {colorSchemes.map((scheme) => (
                     <button
@@ -556,16 +630,12 @@ const Generate = () => {
                     />
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Selected: {selectedColorScheme.name}
-                </p>
+                <p className="text-xs text-gray-500 mt-2">Selected: {selectedColorScheme.name}</p>
               </div>
 
               {/* Model Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Model
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Model</label>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setModel("basic")}
@@ -599,8 +669,6 @@ const Generate = () => {
               </div>
 
               {/* Additional Details */}
-              {/* Additional Details */}
-              {/* Additional Details */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -615,7 +683,6 @@ const Generate = () => {
                   />
                 </div>
 
-                {/* ✅ Only show the WhatsApp button if user is authenticated */}
                 {user && (
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
@@ -629,7 +696,6 @@ const Generate = () => {
                   </div>
                 )}
 
-                {/* WhatsApp Modal */}
                 <WhatsAppConnectModal
                   isOpen={showWhatsAppModal}
                   onClose={() => setShowWhatsAppModal(false)}
@@ -639,196 +705,62 @@ const Generate = () => {
               {/* Generate Button */}
               <PrimaryButton
                 onClick={handleGenerate}
-                disabled={
-                  (mode === "text" && !title) ||
-                  (mode === "youtube" && !youtubeUrl) ||
-                  loading
-                }
+                disabled={(mode === "text" && !title) || (mode === "youtube" && !youtubeUrl) || loading}
                 className="w-full"
               >
-                {loading
-                  ? "Generating..."
-                  : id
-                    ? "Regenerate Thumbnail"
-                    : "Generate Thumbnail"}
+                {loading ? "Generating..." : id ? "Regenerate Thumbnail" : "Generate Thumbnail"}
               </PrimaryButton>
             </div>
 
-            {/* Right Panel: Preview */}
+            {/* Right Panel: 3 Separate Preview Sections */}
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-white mb-6">Preview</h2>
-              <div
-                className={`relative w-full border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center bg-white/5 transition-all duration-300 ${
-                  aspectRatio === "16:9"
-                    ? "aspect-video"
-                    : aspectRatio === "1:1"
-                      ? "aspect-square"
-                      : "aspect-[9/16]"
-                }`}
-              >
-                {thumbnail ? (
-                  <img
-                    src={thumbnail}
-                    alt="Generated thumbnail"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : mode === "youtube" && analyzedThumbnail ? (
-                  <img
-                    src={analyzedThumbnail}
-                    alt="YouTube thumbnail"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : mode === "text" && photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt="Uploaded reference"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : (
-                  <div className="text-center space-y-4">
-                    <ImageIcon className="w-16 h-16 text-gray-500 mx-auto" />
-                    <div className="space-y-1">
-                      <p className="text-white font-medium">
-                        {mode === "youtube"
-                          ? "Recreate your YouTube thumbnail"
-                          : "Generate your first thumbnail"}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {mode === "youtube"
-                          ? "Enter a YouTube URL and click Analyze"
-                          : "Fill out the form and click Generate"}
-                      </p>
-                    </div>
-                  </div>
-                )}
+              <h2 className="text-2xl font-bold text-white mb-6">
+                Preview — 3 AI Models
+              </h2>
 
-                {(loading || analyzing) && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-                    <p className="text-white font-medium">
-                      {analyzing ? "Thumbnail Loading..." : "Generating..."}
+              {/* Progressive display: show previews that have arrived + placeholders for remaining */}
+              <div className="space-y-6">
+                {/* Show a status bar when loading */}
+                {loading && (
+                  <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
+                    <p className="text-white text-sm font-medium">
+                      Generating... {previews.length}/3 ready
                     </p>
                   </div>
                 )}
-              {/* </div>
-              <br />
-              <br/>
-              <div
-                className={`relative w-full border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center bg-white/5 transition-all duration-300 ${
-                  aspectRatio === "16:9"
-                    ? "aspect-video"
-                    : aspectRatio === "1:1"
-                      ? "aspect-square"
-                      : "aspect-[9/16]"
-                }`}
-              >
-                {thumbnail ? (
-                  <img
-                    src={thumbnail}
-                    alt="Generated thumbnail"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : mode === "youtube" && analyzedThumbnail ? (
-                  <img
-                    src={analyzedThumbnail}
-                    alt="YouTube thumbnail"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : mode === "text" && photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt="Uploaded reference"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : (
-                  <div className="text-center space-y-4">
-                    <ImageIcon className="w-16 h-16 text-gray-500 mx-auto" />
-                    <div className="space-y-1">
-                      <p className="text-white font-medium">
-                        {mode === "youtube"
-                          ? "Recreate your YouTube thumbnail"
-                          : "Generate your first thumbnail"}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {mode === "youtube"
-                          ? "Enter a YouTube URL and click Analyze"
-                          : "Fill out the form and click Generate"}
-                      </p>
-                    </div>
-                  </div>
-                )}
 
-                {(loading || analyzing) && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-                    <p className="text-white font-medium">
-                      {analyzing ? "Thumbnail Loading..." : "Generating..."}
+                {/* Hint when nothing is happening yet */}
+                {!loading && previews.length === 0 && (
+                  <div className="text-center py-6">
+                    <p className="text-indigo-400 text-sm">
+                      3 AI models will generate different variations
                     </p>
                   </div>
                 )}
-              </div>
-              <br />
-              <br/>
-              <div
-                className={`relative w-full border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center bg-white/5 transition-all duration-300 ${
-                  aspectRatio === "16:9"
-                    ? "aspect-video"
-                    : aspectRatio === "1:1"
-                      ? "aspect-square"
-                      : "aspect-[9/16]"
-                }`}
-              >
-                {thumbnail ? (
-                  <img
-                    src={thumbnail}
-                    alt="Generated thumbnail"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : mode === "youtube" && analyzedThumbnail ? (
-                  <img
-                    src={analyzedThumbnail}
-                    alt="YouTube thumbnail"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : mode === "text" && photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt="Uploaded reference"
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                ) : (
-                  <div className="text-center space-y-4">
-                    <ImageIcon className="w-16 h-16 text-gray-500 mx-auto" />
-                    <div className="space-y-1">
-                      <p className="text-white font-medium">
-                        {mode === "youtube"
-                          ? "Recreate your YouTube thumbnail"
-                          : "Generate your first thumbnail"}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {mode === "youtube"
-                          ? "Enter a YouTube URL and click Analyze"
-                          : "Fill out the form and click Generate"}
-                      </p>
-                    </div>
-                  </div> */}
-                {/* )} */}
 
-                {(loading || analyzing) && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-xl">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-                    <p className="text-white font-medium">
-                      {analyzing ? "Thumbnail Loading..." : "Generating..."}
-                    </p>
+                {/* Already-arrived previews */}
+                {previews.map((preview, index) => (
+                  <div key={preview.model_id}>
+                    {renderPreviewSection(preview, index)}
                   </div>
-                )}
+                ))}
+
+                {/* Empty placeholder slots for models still generating */}
+                {(loading || previews.length === 0) &&
+                  Array.from({ length: 3 - previews.length }).map((_, i) => (
+                    <div key={`placeholder-${i}`}>
+                      {renderPreviewSection(undefined, previews.length + i)}
+                    </div>
+                  ))
+                }
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ✅ SUCCESS/INSUFFICIENT CREDITS DIALOG */}
+      {/* SUCCESS/INSUFFICIENT CREDITS DIALOG */}
       {showSuccessDialog && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-8 max-w-md w-full space-y-6">
@@ -838,12 +770,9 @@ const Generate = () => {
                   <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Crown className="w-8 h-8 text-red-400" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">
-                    Insufficient Credits
-                  </h3>
+                  <h3 className="text-2xl font-bold text-white mb-2">Insufficient Credits</h3>
                   <p className="text-gray-400">
-                    You need {model === "premium" ? "10" : "5"} credits to
-                    generate this thumbnail.
+                    You need {model === "premium" ? "20" : "10"} credits to generate thumbnails.
                   </p>
                 </>
               ) : (
@@ -852,10 +781,10 @@ const Generate = () => {
                     <Sparkles className="w-8 h-8 text-green-400" />
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2">
-                    Thumbnail Generated!
+                    {previews.length} Thumbnails Generated!
                   </h3>
                   <p className="text-gray-400">
-                    Your thumbnail has been created successfully.
+                    Your thumbnails have been created. Save your favorites below!
                   </p>
                 </>
               )}
@@ -864,21 +793,19 @@ const Generate = () => {
             {creditsRemaining !== null && !insufficientCredits && (
               <div className="bg-white/5 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-400">Credits Remaining</p>
-                <p className="text-3xl font-bold text-yellow-400">
-                  {creditsRemaining}
-                </p>
+                <p className="text-3xl font-bold text-yellow-400">{creditsRemaining}</p>
               </div>
             )}
 
             <div className="space-y-3">
-              {!insufficientCredits && thumbnail && (
+              {!insufficientCredits && previews.length > 0 && (
                 <>
                   <button
-                    onClick={handleDownload}
+                    onClick={() => setShowSuccessDialog(false)}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition"
                   >
-                    <Download className="w-5 h-5" />
-                    Download Thumbnail
+                    <Star className="w-5 h-5" />
+                    View & Save Favorites
                   </button>
 
                   <button
@@ -892,7 +819,7 @@ const Generate = () => {
                     onClick={() => navigate("/community")}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-medium transition"
                   >
-                    View Community
+                    View My Thumbnails
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </>

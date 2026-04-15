@@ -1,5 +1,5 @@
 import express from "express";
-import { generateThumbnail, deleteThumbnail } from "../controllers/thumbnailController.js";
+import { generateThumbnail, deleteThumbnail, saveThumbnail } from "../controllers/thumbnailController.js";
 import multer from "multer";
 import { uploadFrame } from '../controllers/uploadFrameController.js';
 
@@ -20,9 +20,11 @@ ThumbnailRouter.get("/test", (req, res) => {
     res.json({ message: "Thumbnail router is working!" });
 });
 
-// Route for generation
-// Note: Ensure the frontend is sending the file under the field name 'image'
+// Route for generation (3 models in parallel)
 ThumbnailRouter.post("/generate", upload.single('image'), generateThumbnail);
+
+// Route for saving a preview as favorite
+ThumbnailRouter.post("/save", saveThumbnail);
 
 ThumbnailRouter.delete("/delete/:id", deleteThumbnail);
 ThumbnailRouter.post("/upload-frame", uploadFrame);

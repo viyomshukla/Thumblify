@@ -1,24 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Type, Download, Sliders, Image as ImageIcon, Wind, Crop, Check } from 'lucide-react';
+import { Upload, Download, Sliders, Wind, Crop, Check, Wand2, Image as ImageIcon } from 'lucide-react';
+import ImageEditor from 'tui-image-editor';
+import 'tui-image-editor/dist/tui-image-editor.css';
 
 const ThumbnailEditor = () => {
   const canvasRef = useRef(null);
-  const [image, setImage] = useState(null);
-  const [isDraggingText, setIsDraggingText] = useState(false);
+  const tuiEditorRef = useRef(null);
+  const tuiContainerRef = useRef(null);
+  
+  const [imageState, setImageState] = useState(null);
   const [isCropping, setIsCropping] = useState(false);
+  const [showTuiEditor, setShowTuiEditor] = useState(false);
+  const [tuiResult, setTuiResult] = useState(null);
   
   const [adjust, setAdjust] = useState({
     brightness: 100,
-    exposure: 100,
     contrast: 100,
     temperature: 0,
     blur: 0,
   });
 
   const [filter, setFilter] = useState('none');
-  const [text, setText] = useState('YOUR TITLE HERE');
-  const [textPos, setTextPos] = useState({ x: 150, y: 150 });
-  const [fontSize, setFontSize] = useState(60);
   const [watermark] = useState('THUMBLIFY AI');
   const [cropArea, setCropArea] = useState({ x: 50, y: 50, width: 400, height: 300 });
 
@@ -34,15 +36,55 @@ const ThumbnailEditor = () => {
     cool: 'hue-rotate(180deg) saturate(1.2) brightness(1.1)'
   };
 
+  // Initialize TUI Image Editor when modal opens
+  useEffect(() => {
+    if (showTuiEditor && tuiContainerRef.current && !tuiEditorRef.current) {
+      tuiEditorRef.current = new ImageEditor(tuiContainerRef.current, {
+        includeUI: {
+          loadImage: {
+            path: imageState,
+            name: 'Thumbnail',
+          },
+          theme: {
+            'common.bi.image': '',
+            'common.bisize.width': '0px',
+            'common.bisize.height': '0px',
+            'common.backgroundColor': '#1e293b',
+          },
+          menu: ['crop', 'flip', 'rotate', 'draw', 'shape', 'icon', 'text', 'mask', 'filter'],
+          initMenu: 'filter',
+          uiSize: {
+            width: '100%',
+            height: '600px',
+          },
+          menuBarPosition: 'bottom',
+        },
+        cssMaxWidth: 1000,
+        cssMaxHeight: 600,
+        selectionStyle: {
+          cornerSize: 20,
+          rotatingPointOffset: 70,
+        },
+      });
+    }
+
+    return () => {
+      if (tuiEditorRef.current && !showTuiEditor) {
+        tuiEditorRef.current.destroy();
+        tuiEditorRef.current = null;
+      }
+    };
+  }, [showTuiEditor, imageState]);
+
   useEffect(() => {
     applyAllChanges();
-  }, [image, adjust, filter, text, textPos, fontSize, isCropping, cropArea]);
+  }, [imageState, adjust, filter, isCropping, cropArea, tuiResult]);
 
   const applyAllChanges = () => {
     const canvas = canvasRef.current;
-    if (!canvas || !image) return;
+    if (!canvas || !imageState) return;
     const ctx = canvas.getContext('2d');
-    const img = new Image();
+    const img = new window.Image();
     
     img.onload = () => {
       canvas.width = img.width;
@@ -58,19 +100,13 @@ const ThumbnailEditor = () => {
         ctx.globalCompositeOperation = 'source-over';
       }
 
-      ctx.font = `bold ${fontSize}px Arial`;
-      ctx.fillStyle = "#000000"; 
-      ctx.textAlign = "left";
-      ctx.shadowColor = "rgba(255,255,255,0.8)";
-      ctx.shadowBlur = 15;
-      ctx.fillText(text, textPos.x, textPos.y);
-      ctx.shadowBlur = 0;
-
+      // Watermark
       ctx.font = "20px Arial";
       ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
       ctx.textAlign = "right";
       ctx.fillText(watermark, canvas.width - 20, canvas.height - 20);
 
+      // Crop overlay
       if (isCropping) {
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(0, 0, canvas.width, cropArea.y);
@@ -82,26 +118,7 @@ const ThumbnailEditor = () => {
         ctx.strokeRect(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
       }
     };
-    img.src = image;
-  };
-
-  const handleMouseDown = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height);
-    if (Math.abs(x - textPos.x) < 200 && Math.abs(y - textPos.y) < 60) {
-      setIsDraggingText(true);
-    }
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDraggingText) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      setTextPos({
-        x: (e.clientX - rect.left) * (canvasRef.current.width / rect.width),
-        y: (e.clientY - rect.top) * (canvasRef.current.height / rect.height)
-      });
-    }
+    img.src = tuiResult || imageState;
   };
 
   const applyCrop = () => {
@@ -111,7 +128,7 @@ const ThumbnailEditor = () => {
     tempCanvas.width = cropArea.width;
     tempCanvas.height = cropArea.height;
     tempCtx.drawImage(canvas, cropArea.x, cropArea.y, cropArea.width, cropArea.height, 0, 0, cropArea.width, cropArea.height);
-    setImage(tempCanvas.toDataURL());
+    setImageState(tempCanvas.toDataURL());
     setIsCropping(false);
   };
 
@@ -119,13 +136,56 @@ const ThumbnailEditor = () => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => setImage(event.target.result);
+      reader.onload = (event) => setImageState(event.target.result);
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleTuiSave = () => {
+    if (tuiEditorRef.current) {
+      const editedImageData = tuiEditorRef.current.toDataURL();
+      setTuiResult(editedImageData);
+      setImageState(editedImageData);
+      setShowTuiEditor(false);
+    }
+  };
+
+  const handleTuiCancel = () => {
+    setShowTuiEditor(false);
+    if (tuiEditorRef.current) {
+      tuiEditorRef.current.destroy();
+      tuiEditorRef.current = null;
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex overflow-hidden">
+      {/* TUI Editor Modal */}
+      {showTuiEditor && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+          <div className="bg-slate-900 px-6 py-4 flex items-center justify-between border-b border-white/10">
+            <h2 className="text-xl font-bold text-indigo-400">Advanced Editor @Thumblify</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={handleTuiSave}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-semibold"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={handleTuiCancel}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 p-6 overflow-auto">
+            <div ref={tuiContainerRef} className="w-full h-full"></div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Controls */}
       <div className="w-80 bg-slate-900 border-r border-white/10 p-6 space-y-6 overflow-y-auto h-screen scrollbar-hide shrink-0">
         <h2 className="text-xl font-bold text-indigo-400">Thumbnail Studio</h2>
@@ -133,11 +193,34 @@ const ThumbnailEditor = () => {
         <label className="block p-4 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:bg-white/5 text-center transition">
           <Upload size={20} className="mx-auto mb-2 text-indigo-400"/>
           <span className="text-sm">Upload Source</span>
-          <input type="file" className="hidden" onChange={handleImageUpload} />
+          <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
         </label>
 
+        {/* Advanced Editor Button - Always Show */}
+        <button 
+          onClick={() => setShowTuiEditor(true)}
+          disabled={!imageState}
+          className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-lg ${
+            imageState 
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' 
+              : 'bg-gray-700 cursor-not-allowed opacity-50'
+          }`}
+        >
+          Advanced Editor
+        </button>
+
         <div className="space-y-2">
-          <button onClick={() => setIsCropping(!isCropping)} className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg border transition ${isCropping ? 'bg-red-500/20 border-red-500 text-red-300' : 'bg-white/5 border-white/10'}`}>
+          <button 
+            onClick={() => setIsCropping(!isCropping)} 
+            disabled={!imageState}
+            className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg border transition ${
+              !imageState 
+                ? 'bg-gray-700 border-gray-600 cursor-not-allowed opacity-50'
+                : isCropping 
+                  ? 'bg-red-500/20 border-red-500 text-red-300' 
+                  : 'bg-white/5 border-white/10'
+            }`}
+          >
             <Crop size={18}/> {isCropping ? 'Cancel Crop' : 'Crop Mode'}
           </button>
           {isCropping && (
@@ -151,17 +234,22 @@ const ThumbnailEditor = () => {
           <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-400"><Wind size={16}/> Filters</h3>
           <div className="grid grid-cols-3 gap-2">
             {Object.keys(filters).map((f) => (
-              <button key={f} onClick={() => setFilter(f)} className={`py-2 text-[10px] uppercase rounded border transition ${filter === f ? 'bg-indigo-600 border-indigo-400' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+              <button 
+                key={f} 
+                onClick={() => setFilter(f)} 
+                disabled={!imageState}
+                className={`py-2 text-[10px] uppercase rounded border transition ${
+                  !imageState
+                    ? 'bg-gray-700 border-gray-600 cursor-not-allowed opacity-50'
+                    : filter === f 
+                      ? 'bg-indigo-600 border-indigo-400' 
+                      : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
                 {f}
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="space-y-3 pt-4 border-t border-white/10">
-          <h3 className="text-sm font-semibold flex items-center gap-2 text-indigo-400"><Type size={16}/> Text Overlay</h3>
-          <input type="text" value={text} onChange={(e) => setText(e.target.value)} className="w-full bg-black/40 border border-white/10 p-2 rounded text-sm text-white" placeholder="Your Title..." />
-          <input type="range" min="20" max="250" value={fontSize} onChange={(e) => setFontSize(e.target.value)} className="w-full" />
         </div>
 
         <div className="space-y-4 pt-4 border-t border-white/10">
@@ -169,41 +257,50 @@ const ThumbnailEditor = () => {
           {['brightness', 'temperature', 'blur'].map((adj) => (
             <div key={adj} className="space-y-1">
               <label className="text-[10px] uppercase text-gray-400">{adj}</label>
-              <input type="range" min={adj === 'temperature' ? -100 : 0} max={200} value={adjust[adj]} onChange={(e) => setAdjust({...adjust, [adj]: e.target.value})} className="w-full h-1 bg-white/10 appearance-none rounded" />
+              <input 
+                type="range" 
+                min={adj === 'temperature' ? -100 : 0} 
+                max={200} 
+                value={adjust[adj]} 
+                onChange={(e) => setAdjust({...adjust, [adj]: e.target.value})} 
+                disabled={!imageState}
+                className={`w-full h-1 bg-white/10 appearance-none rounded ${!imageState ? 'opacity-50 cursor-not-allowed' : ''}`}
+              />
             </div>
           ))}
         </div>
 
-        <button onClick={() => {
+        <button 
+          onClick={() => {
             const link = document.createElement('a');
             link.download = 'thumb-export.png';
             link.href = canvasRef.current.toDataURL();
             link.click();
           }}
-          className="w-full bg-indigo-600 py-3 rounded-xl font-bold mt-4 hover:bg-indigo-500 transition shadow-lg shadow-indigo-500/20"
+          disabled={!imageState}
+          className={`w-full py-3 rounded-xl font-bold mt-4 transition shadow-lg ${
+            imageState
+              ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20'
+              : 'bg-gray-700 cursor-not-allowed opacity-50'
+          }`}
         >
           <Download size={18} className="inline mr-2"/> Download HD
         </button>
       </div>
 
-      {/* ✅ Workspace with 9X9 (1:1) Proportional View Area */}
+      {/* Workspace */}
       <div className="flex-1 bg-black flex items-center justify-center p-8">
         <div className="relative aspect-square w-full max-w-[600px] bg-slate-900/50 border border-white/5 rounded-2xl flex items-center justify-center overflow-hidden">
-          {!image && (
+          {!imageState && (
             <div className="text-center opacity-40">
               <ImageIcon size={64} className="mx-auto mb-4"/>
               <p>Upload an image to start</p>
             </div>
           )}
-          {/* Canvas will fit comfortably within the 1:1 workspace */}
           <canvas 
             ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={() => setIsDraggingText(false)}
-            onMouseLeave={() => setIsDraggingText(false)}
-            className={`max-w-full max-h-full object-contain shadow-2xl ${isDraggingText ? 'cursor-grabbing' : 'cursor-grab'}`}
-            style={{ display: image ? 'block' : 'none' }}
+            className="max-w-full max-h-full object-contain shadow-2xl"
+            style={{ display: imageState ? 'block' : 'none' }}
           />
         </div>
       </div>

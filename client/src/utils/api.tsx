@@ -28,6 +28,52 @@ export const authAPI = {
   verify: () => api.get('/auth/verify'),
 };
 
+// ===== SSE Helper — parses text/event-stream from fetch =====
+async function consumeSSE(
+  url: string,
+  fetchOpts: RequestInit,
+  onPreview: (preview: any) => void,
+  onDone: (info: any) => void,
+  onError: (msg: string) => void,
+) {
+  const res = await fetch(url, fetchOpts);
+  if (!res.body) { onError('No response body'); return; }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE messages are separated by double newlines
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() || ''; // keep incomplete chunk
+
+    for (const part of parts) {
+      const line = part.replace(/^data:\s*/, '').trim();
+      if (!line) continue;
+      try {
+        const parsed = JSON.parse(line);
+
+        if (parsed.preview) {
+          onPreview(parsed.preview);
+        } else if (parsed.done) {
+          onDone(parsed);
+        } else if (parsed.error) {
+          onError(parsed.error);
+        }
+        // modelError events are informational — we just skip them on the client
+      } catch {
+        // ignore non-JSON lines
+      }
+    }
+  }
+}
+
 // Thumbnail APIs
 export const thumbnailAPI = {
   generate: (data: FormData | any) => {
@@ -41,6 +87,7 @@ export const thumbnailAPI = {
     return api.post('/thumbnail/generate', data);
   },
   delete: (id: string) => api.delete(`/thumbnail/delete/${id}`),
+  save: (data: any) => api.post('/thumbnail/save', data),
   
   // YouTube APIs
   analyzeYoutube: (youtubeUrl: string) => 
@@ -48,6 +95,37 @@ export const thumbnailAPI = {
     
   improveYoutube: (data: any) => 
     api.post('/youtube/improve', data),
+
+  // ===== SSE Streaming Functions =====
+
+  /** Stream text-mode generation via SSE */
+  generateStream: (
+    data: FormData,
+    onPreview: (preview: any) => void,
+    onDone: (info: any) => void,
+    onError: (msg: string) => void,
+  ) => {
+    return consumeSSE(`${API_URL}/thumbnail/generate`, {
+      method: 'POST',
+      body: data,
+      credentials: 'include' as RequestCredentials,
+    }, onPreview, onDone, onError);
+  },
+
+  /** Stream YouTube improve generation via SSE */
+  improveYoutubeStream: (
+    data: any,
+    onPreview: (preview: any) => void,
+    onDone: (info: any) => void,
+    onError: (msg: string) => void,
+  ) => {
+    return consumeSSE(`${API_URL}/youtube/improve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include' as RequestCredentials,
+    }, onPreview, onDone, onError);
+  },
 };
 
 // User APIs
@@ -59,8 +137,8 @@ export const userAPI = {
 
 // Chat APIs
 export const chatAPI = {
-  sendMessage: (message: string, conversationHistory?: any[]) => 
-    api.post('/chat/message', { message, conversationHistory }),
+  sendMessage: (message: string, conversationHistory?: any[], currentStep?: string, thumbnailData?: any) => 
+    api.post('/chat/message', { message, conversationHistory, currentStep, thumbnailData }),
 };
 // WhatsApp APIs
 export const whatsappAPI = {
