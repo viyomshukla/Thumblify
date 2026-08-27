@@ -2,6 +2,7 @@ import { Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../utils/api';
 
 
 const PrimaryButton = ({ children, className, onClick, disabled }) => (
@@ -52,7 +53,7 @@ const plansData = [
   },
   {
     name: 'Professional',
-    price: '₹499',
+    price: '₹498',
     credits: '75 credits',
     desc: 'Great for growing teams',
     features: [
@@ -63,12 +64,12 @@ const plansData = [
       'API access'
     ],
     popular: true,
-    amount: 499,
+    amount: 1845,
     creditsToAdd: 75
   },
   {
     name: 'Enterprise',
-    price: '₹899',
+    price: '₹1000',
     credits: '100 credits',
     desc: 'For large-scale operations',
     features: [
@@ -80,7 +81,7 @@ const plansData = [
       'White-label options'
     ],
     popular: false,
-    amount: 899,
+    amount: 1300,
     creditsToAdd: 100
   }
 ];
@@ -97,7 +98,7 @@ export default function Pricing() {
   });
 
   const { updateCredits } = useAuth();
-  const API_URL = 'http://localhost:5000';
+  const API_URL = API_BASE;
 
 
   const handlePayment = async (plan, index) => {

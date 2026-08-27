@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+// Backend origin, e.g. https://thumblify-backend.onrender.com — no trailing /api
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = `${API_BASE}/api`;
 
 const api = axios.create({
   baseURL: API_URL,

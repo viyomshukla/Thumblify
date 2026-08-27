@@ -3,6 +3,7 @@ import { PrimaryButton, GhostButton } from './Buttons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../utils/api';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -63,7 +64,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     // ✅ Google OAuth Handler
     const handleGoogleLogin = () => {
         // Redirect to backend Google OAuth route
-        window.location.href = 'http://localhost:5000/api/auth/google';
+        window.location.href = `${API_BASE}/api/auth/google`;
     };
 
     return (

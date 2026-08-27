@@ -26,21 +26,42 @@ app.use((req, res, next) => {
   next();
 });
 
+// Behind Render/Railway/Vercel proxies, required for secure cookies to be set
+app.set('trust proxy', 1);
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean);
+
 app.use(cors({
-  origin:[process.env.FRONTEND_URL,'http://localhost:3000'],
-  credentials:true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Twilio webhooks, chrome extension)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn(`🚫 Blocked CORS origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
 }));
 
 app.use(express.json({ limit: '50mb' })); // For JSON payloads
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ✅ Session configuration (MUST be before passport)
+// In production the client is on a different domain than the API, so the
+// session cookie must be SameSite=None + Secure or the browser drops it.
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7,
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
   },
   store: MongoStore.create({
     mongoUrl: process.env.MONGODB,

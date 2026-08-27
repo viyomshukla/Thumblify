@@ -21,8 +21,10 @@ passport.deserializeUser(async (id, done) => {
 });
 
 // ✅ Define callbackURL BEFORE using it
-const callbackURL = process.env.GOOGLE_CALLBACK_URL || 
-  `${process.env.VERCEL ? 'https://thumblify-backend-dun.vercel.app' : 'http://localhost:5000'}/api/auth/google/callback`;
+// In production GOOGLE_CALLBACK_URL must be set and must match the Authorized
+// redirect URI registered in Google Cloud Console exactly.
+const callbackURL = process.env.GOOGLE_CALLBACK_URL ||
+  'http://localhost:5000/api/auth/google/callback';
 
 // Google OAuth Strategy
 passport.use(

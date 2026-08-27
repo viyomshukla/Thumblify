@@ -161,7 +161,7 @@ router.post('/improve', protectRoute, async (req, res) => {
     const promptVariations = createVariedPrompts(metadata, style, colorScheme, additionalDetails);
 
     const modelConfigs = [
-      { id: "gemini-flash", replicateModel: "google/gemini-2.5-flash-image", label: "Gemini 2.5 Flash", prompt: promptVariations[0].prompt, folder: "gemini_gen" },
+      { id: "gemini-flash", replicateModel: "google/nano-banana-pro", label: "Gemini 2.5 Flash", prompt: promptVariations[0].prompt, folder: "gemini_gen" },
       { id: "seedream-4", replicateModel: "google/gemini-2.5-flash-image", label: "SeeDream 4", prompt: promptVariations[1].prompt, folder: "seedream_gen", requiresFile: true },
       { id: "banana-pro", replicateModel: "google/nano-banana-pro", label: "Nano Banana Pro", prompt: promptVariations[2].prompt, folder: "banana_gen" }
     ];
