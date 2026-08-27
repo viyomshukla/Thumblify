@@ -29,16 +29,24 @@ app.use((req, res, next) => {
 // Behind Render/Railway/Vercel proxies, required for secure cookies to be set
 app.set('trust proxy', 1);
 
+// Browsers send Origin with no trailing slash, so normalise the allowlist the
+// same way — otherwise a FRONTEND_URL pasted as "https://host/" blocks everyone.
+const stripSlash = (url) => url.replace(/\/+$/, '');
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5173',
   'http://localhost:3000',
-].filter(Boolean);
+].filter(Boolean).map(stripSlash);
+
+console.log('🔓 Allowed CORS origins:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (curl, Twilio webhooks, chrome extension)
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || allowedOrigins.includes(stripSlash(origin))) {
+      return callback(null, true);
+    }
     console.warn(`🚫 Blocked CORS origin: ${origin}`);
     return callback(new Error('Not allowed by CORS'));
   },
