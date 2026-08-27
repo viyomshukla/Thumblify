@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// Backend origin, e.g. https://thumblify-backend.onrender.com — no trailing /api
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Backend origin, e.g. https://thumblify-backend.onrender.com — no trailing /api.
+// Trailing slashes are stripped so a pasted "https://host/" can't produce "//api/...".
+const rawBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API_BASE = rawBase.replace(/\/+$/, '');
 const API_URL = `${API_BASE}/api`;
 
 const api = axios.create({
