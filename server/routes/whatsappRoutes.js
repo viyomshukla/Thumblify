@@ -88,11 +88,34 @@ router.post('/webhook', async (req, res) => {
     console.log('👤 From:', phoneNumber);
     console.log('💬 Message:', messageBody);
 
-    // Find user
-    const whatsappUser = await WhatsAppUser.findOne({ 
+    // Find user. The website stores whatever the user typed (prefixed with "+"),
+    // which may omit the country code, while Twilio always sends the full
+    // international number. Fall back to matching on the last 10 digits.
+    let whatsappUser = await WhatsAppUser.findOne({
       phoneNumber,
-      isActive: true 
+      isActive: true
     });
+
+    if (!whatsappUser) {
+      const last10 = phoneNumber.replace(/\D/g, '').slice(-10);
+      console.log(`🔎 No exact match for ${phoneNumber}, trying last 10 digits: ${last10}`);
+      whatsappUser = await WhatsAppUser.findOne({
+        phoneNumber: { $regex: last10 + '$' },
+        isActive: true
+      });
+
+      if (whatsappUser) {
+        // Heal the record so future lookups hit the fast path
+        console.log(`🔧 Matched stored number ${whatsappUser.phoneNumber}, updating to ${phoneNumber}`);
+        whatsappUser.phoneNumber = phoneNumber;
+        await whatsappUser.save();
+      }
+    }
+
+    if (!whatsappUser) {
+      const total = await WhatsAppUser.countDocuments({ isActive: true });
+      console.error(`❌ No active WhatsApp user matches ${phoneNumber} (${total} active records exist)`);
+    }
 
     if (!whatsappUser) {
       await sendWhatsAppMessage(From, 
