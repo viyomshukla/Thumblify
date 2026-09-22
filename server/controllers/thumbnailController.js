@@ -176,7 +176,7 @@ export const generateThumbnail = async (req, res) => {
       return;
     }
 
-    const creditCost = modelTier === "premium" ? 20 : 10;
+    const creditCost = modelTier === "premium" ? 10 : 5;
     if (user.credits < creditCost) {
       sendSSE({ error: "Insufficient credits", required: creditCost, available: user.credits });
       res.end();
